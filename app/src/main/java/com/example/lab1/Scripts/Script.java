@@ -3,32 +3,28 @@ package com.example.lab1.Scripts;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
-import android.provider.ContactsContract;
-import android.util.FloatProperty;
-import android.util.Log;
-import android.util.Pair;
 
 import androidx.annotation.RequiresApi;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.Console;
-import java.util.ArrayList;
-import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.Random;
-import java.util.Set;
-import java.util.TreeMap;
-
-import javax.security.auth.Subject;
-
-import kotlin.contracts.Returns;
 
 class CodeLineBit{
+    private static String[][] operators={
+            {"=", "++", "--", "+=", "-=", "*=", "/=", "%="},
+            {"||"},
+            {"&&"},
+            {"<", ">", "<=", ">=", "!=", "=="},
+            {"*", "/", "%"},
+            {"+", "-"}
+    };
     private String operation;
     private CodeLineBit first, second;
 
-    Float isMathematicalExpresion(String expresion, float ){
+
+    Float isMathematicalExpresion(String expresion, CodeLineBit value){
         int cas = 0;
         if(expresion.startsWith("sin("))
             cas = 1;
@@ -54,7 +50,7 @@ class CodeLineBit{
         if(cas == 0)
             return null;
 
-        int nrP = 0;
+        /*int nrP = 0;
         int curent = expresion.indexOf('(');
         int start = curent;
         for(;curent<expresion.length();curent++){
@@ -90,20 +86,62 @@ class CodeLineBit{
             case 9:
                 return (float)((int)(evaluateExpresion(exp)));
             case 10:
-                return ran.nextFloat();
-        }
+                return CodeBlock.ran.nextFloat();
+        }*/
         return 0f;
     }
-    CodeLineBit(String command){
+
+    private static CodeLineBit createBit(char[] command, int sta, int end, int[] parentheses){
+        if(command[sta] == '(' && parentheses[sta] == parentheses[end-1]){
+            int isFull = 1;
+            for(int i=sta+1; i<end;i++)
+                if(parentheses[i] != parentheses[sta]){
+                    isFull = 0;
+                    break;
+                }
+            if(isFull == 1)
+                return createBit(command, sta+1, end-1, parentheses);
+        }
+
+        CodeLineBit newB = new CodeLineBit();
+
+        for(int i=sta;i<end;i++){
+            if(parentheses[sta] != parentheses[i])
+                continue;
+            
+        }
+
+        return newB;
+    }
+
+    public static CodeLineBit createBit(String command){
+        command = command.replaceAll("\\s","");
+
+        int[] para = new int[command.length()];
+        char[] car = command.toCharArray();
+        int index = 0;
+
+        for(int i=0;i<car.length;i++){
+            if(car[i] == '(')
+                index++;
+            para[i] = index;
+            if(car[i] == ')')
+                index--;
+        }
+        if(index != 0)
+            return new CodeLineBit();
+
+        return createBit(car, 0, car.length, para);
+    }
+
+    CodeLineBit(){
+        operation = "";
         first = second = null;
-        String[] paart = command.split("=");
-        if(paart.length == 1)
-            operation
     }
 }
 
 class CodeBlock{
-    static Random ran = new Random();
+    public static Random ran = new Random();
     String[] lines = null;
     CodeBlock next = null;
 
@@ -114,7 +152,9 @@ class CodeBlock{
 
     }
 
-    float getValueOfVariable(String id){
+    public static float getValueOfVariable(String id,
+                           HashMap<String, Float> curentFloats,
+                           HashMap<String, Float[]> curentMmatrix){
         if(curentMmatrix == null || curentFloats == null)
             return  0;
         if(id.contains("[")){
@@ -129,28 +169,35 @@ class CodeBlock{
         }
         return 0;
     }
+    private float getValueOfVariable(String id){
+        return getValueOfVariable(id, curentFloats, curentMmatrix);
+    }
 
-    private void assigne(String id, float value){
-        if(curentMmatrix == null || curentFloats == null)
+    public static void assign(String id, float value,
+                              HashMap<String, Float> curentFloats,
+                              HashMap<String, Float[]> curentMmatrix) {
+        if (curentMmatrix == null || curentFloats == null)
             return;
-        if(id.contains("[")){
+        if (id.contains("[")) {
 
-        }
-        else{
+        } else {
             curentFloats.put(id, value);
         }
     }
+    private void assign(String id, float value){
+        assign(id, value, curentFloats, curentMmatrix);
+    }
 
-    void assigne(String line){
+    void assign(String line){
         line = line.replaceAll("\\s+","");
 
         if(line.endsWith("++")){
             line = line.substring(0, line.length()-2);
-            assigne(line, getValueOfVariable(line) + 1);
+            assign(line, getValueOfVariable(line) + 1);
         }
         else if(line.endsWith("--")){
             line = line.substring(0, line.length()-2);
-            assigne(line, getValueOfVariable(line) - 1);
+            assign(line, getValueOfVariable(line) - 1);
         }
 
         String[] aux;
@@ -158,21 +205,21 @@ class CodeBlock{
         if(aux.length == 2){
             String id = aux[0];
             float value = getValueOfVariable(id) + evaluateExpresion(aux[1]);
-            assigne(id, value);
+            assign(id, value);
             return;
         }
         aux = line.split("-=");
         if(aux.length == 2){
             String id = aux[0];
             float value = getValueOfVariable(id) + evaluateExpresion(aux[1]);
-            assigne(id, value);
+            assign(id, value);
             return;
         }
         aux = line.split("\\*=");
         if(aux.length == 2){
             String id = aux[0];
             float value = getValueOfVariable(id) * evaluateExpresion(aux[1]);
-            assigne(id, value);
+            assign(id, value);
             return;
         }
         aux = line.split("/=");
@@ -181,24 +228,24 @@ class CodeBlock{
             float value = evaluateExpresion(aux[1]);
             if(value == 0)
                 value = 0.0000001f;
-            assigne(id, getValueOfVariable(id) / value);
+            assign(id, getValueOfVariable(id) / value);
             return;
         }
         aux = line.split("%=");
         if(aux.length == 2){
             String id = aux[0];
             float value = ((int)getValueOfVariable(id)) % ((int)evaluateExpresion(aux[1]));
-            assigne(id, value);
+            assign(id, value);
             return;
         }
         aux = line.split("=");
         if(aux.length == 2){
             String id = aux[0];
             float value = evaluateExpresion(aux[1]);
-            assigne(id, value);
+            assign(id, value);
             return;
         }
-        assigne(line, 0);
+        assign(line, 0);
     }
 
     Float isMathematicalExpresion(String expresion){
@@ -429,7 +476,7 @@ class CodeBlock{
 
 
         for (String line : lines) {
-            assigne(line);
+            assign(line);
         }
 
         if(next != null) next.run(floats, matrix);
@@ -649,8 +696,8 @@ class ForBlock extends IfBlock{
 
         String[] parts = this.lines[0].substring(this.lines[0].indexOf('(') + 1, this.lines[0].length() - 1).split(":");
 
-        this.assigne(parts[0]);
-        for(;evaluateBooleanExpresion(parts[1]);this.assigne(parts[2])){
+        this.assign(parts[0]);
+        for(;evaluateBooleanExpresion(parts[1]);this.assign(parts[2])){
             if(this.then != null)
                 this.then.run(floats, matrix);
         }
