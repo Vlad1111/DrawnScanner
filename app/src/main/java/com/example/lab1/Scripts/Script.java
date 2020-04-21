@@ -10,88 +10,24 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Random;
+import java.util.regex.Pattern;
 
 class CodeLineBit{
-    private static String[][] operators={
-            {"=", "++", "--", "+=", "-=", "*=", "/=", "%="},
+    private static final String[][] operators={
+            {":"},
             {"||"},
             {"&&"},
-            {"<", ">", "<=", ">=", "!=", "=="},
-            {"*", "/", "%"},
-            {"+", "-"}
+            {"<=", ">=", "!=", "<", ">", "=="},
+            {"=", "++", "--", "+=", "-=", "*=", "/=", "%="},
+            {"+", "-"},
+            {"*", "/", "%"}
     };
-    private String operation;
-    private CodeLineBit first, second;
-
-
-    Float isMathematicalExpresion(String expresion, CodeLineBit value){
-        int cas = 0;
-        if(expresion.startsWith("sin("))
-            cas = 1;
-        else if(expresion.startsWith("cos("))
-            cas = 2;
-        else if(expresion.startsWith("tan("))
-            cas = 3;
-        else if(expresion.startsWith("tanh("))
-            cas = 4;
-        else if(expresion.startsWith("ln("))
-            cas = 5;
-        else if(expresion.startsWith("sqrt("))
-            cas = 6;
-        else if(expresion.startsWith("abs("))
-            cas = 7;
-        else if(expresion.startsWith("sign("))
-            cas = 8;
-        else if(expresion.startsWith("int("))
-            cas = 9;
-        else if(expresion.startsWith("ran("))
-            cas = 10;
-
-        if(cas == 0)
-            return null;
-
-        /*int nrP = 0;
-        int curent = expresion.indexOf('(');
-        int start = curent;
-        for(;curent<expresion.length();curent++){
-            if(expresion.charAt(curent) == '(')
-                nrP++;
-            else if(expresion.charAt(curent) == ')')
-                nrP --;
-            if(nrP == 0)
-                break;
-        }
-        if(curent != expresion.length() - 1)
-            return null;
-
-        String exp = expresion.substring(start+1, expresion.length() - 1);
-
-        switch (cas){
-            case 1:
-                return (float)Math.sin(evaluateExpresion(exp));
-            case 2:
-                return (float)Math.cos(evaluateExpresion(exp));
-            case 3:
-                return (float)Math.tan(evaluateExpresion(exp));
-            case 4:
-                return (float)Math.tanh(evaluateExpresion(exp));
-            case 5:
-                return (float)Math.log(evaluateExpresion(exp));
-            case 6:
-                return (float)Math.sqrt(evaluateExpresion(exp));
-            case 7:
-                return Math.abs(evaluateExpresion(exp));
-            case 8:
-                return Math.signum(evaluateExpresion(exp));
-            case 9:
-                return (float)((int)(evaluateExpresion(exp)));
-            case 10:
-                return CodeBlock.ran.nextFloat();
-        }*/
-        return 0f;
-    }
+    String operation;
+    CodeLineBit first, second;
 
     private static CodeLineBit createBit(char[] command, int sta, int end, int[] parentheses){
+        if(sta >= end)
+            return new CodeLineBit();
         if(command[sta] == '(' && parentheses[sta] == parentheses[end-1]){
             int isFull = 1;
             for(int i=sta+1; i<end;i++)
@@ -105,16 +41,46 @@ class CodeLineBit{
 
         CodeLineBit newB = new CodeLineBit();
 
-        for(int i=sta;i<end;i++){
-            if(parentheses[sta] != parentheses[i])
-                continue;
-            
+        for (String[] operator : operators) {
+            for (int i = sta; i < end - 1; i++) {
+                if (parentheses[sta] != parentheses[i])
+                    continue;
+                for (String operand : operator) {
+                    if (i + operand.length() >= end)
+                        continue;
+
+                    if (operand.charAt(0) == command[i]) {
+                        boolean isThisIt = true;
+                        for (int j = 1; j < operand.length(); j++)
+                            if (operand.charAt(j) != command[i + j])
+                                isThisIt = false;
+                        if (isThisIt) {
+                            newB.operation = operand;
+                            newB.first = createBit(command, sta, i, parentheses);
+                            newB.second = createBit(command, i + operand.length(), end, parentheses);
+                            return newB;
+                        }
+                    }
+                }
+            }
         }
 
+        if(parentheses[sta] + 1 == parentheses[end - 1]){
+            int i=sta;
+            for(;i<end;i++){
+                if(command[i] == '('){
+                    newB.operation = String.copyValueOf(command, sta, i-sta);
+                    break;
+                }
+            }
+            newB.first = createBit(command, i+1, end-1, parentheses);
+            return newB;
+        }
+        newB.operation = String.copyValueOf(command, sta, end-sta);
         return newB;
     }
 
-    public static CodeLineBit createBit(String command){
+    static CodeLineBit createBit(String command){
         command = command.replaceAll("\\s","");
 
         int[] para = new int[command.length()];
@@ -134,15 +100,167 @@ class CodeLineBit{
         return createBit(car, 0, car.length, para);
     }
 
-    CodeLineBit(){
+    private CodeLineBit(){
         operation = "";
         first = second = null;
+    }
+
+    float run(
+            HashMap<String, Float> floats,
+            HashMap<String, Float[]> matrix) {
+        float firstF;
+        float secondF = 0;
+        if (second != null)
+            secondF = second.run(floats, matrix);
+        if (first != null)
+            firstF = first.run(floats, matrix);
+        else {
+            firstF = secondF;
+            secondF = 0;
+        }
+        switch (operation) {
+            case "+":
+                return firstF + secondF;
+            case "-":
+                return firstF - secondF;
+            case "*":
+                return firstF * secondF;
+            case "/":
+                if (secondF != 0)
+                    return firstF + secondF;
+                return firstF / 0.0000001f;
+            case "%":
+                if ((int) secondF != 0)
+                    return (int) firstF % (int) secondF;
+                return firstF;
+            case "<":
+                if (firstF < secondF)
+                    return 1;
+                return -1;
+            case "<=":
+                if (firstF <= secondF)
+                    return 1;
+                return -1;
+            case ">":
+                if (firstF > secondF)
+                    return 1;
+                return -1;
+            case ">=":
+                if (firstF >= secondF)
+                    return 1;
+                return -1;
+            case "!=":
+                if (firstF != secondF)
+                    return 1;
+                return -1;
+            case "==":
+                if (firstF == secondF)
+                    return 1;
+                return -1;
+            case "=":
+                if (first != null)
+                    CodeBlock.assign(first.operation, secondF, floats, matrix);
+                return 0;
+            case "+=":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    CodeBlock.assign(first.operation, val + secondF, floats, matrix);
+                }
+                return 0;
+            case "-=":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    CodeBlock.assign(first.operation, val - secondF, floats, matrix);
+                }
+                return 0;
+            case "*=":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    CodeBlock.assign(first.operation, val * secondF, floats, matrix);
+                }
+                return 0;
+            case "/=":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    if (secondF == 0)
+                        secondF = 0.0000001f;
+                    CodeBlock.assign(first.operation, val / secondF, floats, matrix);
+                }
+                return 0;
+            case "%=":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    if ((int) secondF == 0)
+                        return 0;
+                    CodeBlock.assign(first.operation, (int) val % (int) secondF, floats, matrix);
+                }
+                return 0;
+            case "++":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    CodeBlock.assign(first.operation, val + 1, floats, matrix);
+                }
+                return 0;
+            case "--":
+                if (first != null) {
+                    float val = CodeBlock.getValueOfVariable(first.operation, floats, matrix);
+                    CodeBlock.assign(first.operation, val - 1, floats, matrix);
+                }
+                return 0;
+        }
+
+        switch (operation) {
+            case "sin":
+                return (float) Math.sin(firstF);
+            case "cos":
+                return (float) Math.cos(firstF);
+            case "tan":
+                return (float) Math.tan(firstF);
+            case "tanh":
+                return (float) Math.tanh(firstF);
+            case "ln":
+                return (float) Math.log(firstF);
+            case "sqrt":
+                return (float) Math.sqrt(firstF);
+            case "abs":
+                return Math.abs(firstF);
+            case "sign":
+                return Math.signum(firstF);
+            case "int":
+                return (float) ((int) (firstF));
+            case "ran":
+                return CodeBlock.ran.nextFloat();
+            case "floor":
+                return (float) Math.floor(firstF);
+        }
+
+        Pattern pattern = Pattern.compile("-?\\d+(\\.\\d+)?");
+        if (pattern.matcher(operation).matches())
+            try {
+                return Float.parseFloat(operation);
+            } catch (Exception ex) {
+                return CodeBlock.getValueOfVariable(operation, floats, matrix);
+            }
+
+        return CodeBlock.getValueOfVariable(operation, floats, matrix);
+    }
+
+    @NotNull
+    @Override
+    public String toString() {
+        String rez = "";
+        if(first != null)
+            rez += first.toString() + " ";
+        if(second != null)
+            rez += second.toString() + " ";
+        rez += operation;
+        return "(" + rez + ")";
     }
 }
 
 class CodeBlock{
-    public static Random ran = new Random();
-    String[] lines = null;
+    static Random ran = new Random();
+    CodeLineBit[] lines = null;
     CodeBlock next = null;
 
     HashMap<String, Float> curentFloats = null;
@@ -152,20 +270,17 @@ class CodeBlock{
 
     }
 
-    public static float getValueOfVariable(String id,
+    static float getValueOfVariable(String id,
                            HashMap<String, Float> curentFloats,
                            HashMap<String, Float[]> curentMmatrix){
-        if(curentMmatrix == null || curentFloats == null)
-            return  0;
         if(id.contains("[")){
 
         }
         else{
-            Float rez = curentFloats.get(id);
-            System.out.println(id + " -> " + rez);
-            if(rez == null)
+            //Float rez = curentFloats.get(id);
+            //if(rez == null)
                 return 0;
-            return rez;
+           // return rez;
         }
         return 0;
     }
@@ -173,15 +288,13 @@ class CodeBlock{
         return getValueOfVariable(id, curentFloats, curentMmatrix);
     }
 
-    public static void assign(String id, float value,
+    static void assign(String id, float value,
                               HashMap<String, Float> curentFloats,
                               HashMap<String, Float[]> curentMmatrix) {
-        if (curentMmatrix == null || curentFloats == null)
-            return;
         if (id.contains("[")) {
 
         } else {
-            curentFloats.put(id, value);
+            //curentFloats.put(id, value);
         }
     }
     private void assign(String id, float value){
@@ -400,7 +513,10 @@ class CodeBlock{
         int firstA = instructions.indexOf('{');
         int firstB = firstA;
         if(firstA == -1){
-            lines = instructions.split(";");
+            String[] lines = instructions.split(";");
+            this.lines = new CodeLineBit[lines.length];
+            for(int i=0;i<lines.length;i++)
+                this.lines[i] = CodeLineBit.createBit(lines[i]);
             //lines = new String[1];
             //lines[0] = "DICKS";
         }
@@ -411,18 +527,21 @@ class CodeBlock{
             }
             if(firstA != -1){
                 String lins = instructions.substring(0, firstA);
-                lines = lins.split(";");
+                String[] lines = lins.split(";");
+                this.lines = new CodeLineBit[lines.length];
+                for(int i=0;i<lines.length;i++)
+                    this.lines[i] = CodeLineBit.createBit(lines[i]);
             }
             else {
                 String aux = instructions.substring(0, firstB);
                 aux = aux.trim();
                 if(!aux.startsWith("if(") && !aux.startsWith("else") &&
                         !aux.startsWith("while(") && !aux.startsWith("for(")){
-                    lines = new String[1];
-                    lines[0] = aux;
+                    lines = new CodeLineBit[1];
+                    lines[0] = CodeLineBit.createBit(aux);
                 }
                 else {
-                    lines = new String[0];
+                    lines = new CodeLineBit[0];
                     //firstA = firstB - 1;
                 }
             }
@@ -475,8 +594,8 @@ class CodeBlock{
         curentMmatrix = matrix;
 
 
-        for (String line : lines) {
-            assign(line);
+        for (CodeLineBit line : lines) {
+            line.run(floats, matrix);
         }
 
         if(next != null) next.run(floats, matrix);
@@ -487,7 +606,8 @@ class CodeBlock{
     public String toString() {
         StringBuilder rez = new StringBuilder();
         rez.append("start simple block\n");
-        for (String line : lines) rez.append("> ").append(line).append("\n");
+        for (CodeLineBit line : lines)
+            rez.append("> ").append(line).append("\n");
         rez.append("end simple block\n");
         if(next == null)
         {
@@ -505,8 +625,8 @@ class IfBlock extends CodeBlock{
     IfBlock(String instructions) {
         super();
         int firstA = instructions.indexOf('{');
-        this.lines = new String[1];
-        this.lines[0] = instructions.substring(0, firstA);
+        this.lines = new CodeLineBit[1];
+        this.lines[0] = CodeLineBit.createBit(instructions.substring(0, firstA));
         int nrP = 1;
         for(int i=firstA+1;i<instructions.length();i++) {
             if(instructions.charAt(i) == '{')
@@ -528,7 +648,7 @@ class IfBlock extends CodeBlock{
         while(next != null && next.lines.length == 0)
             next = next.next;
 
-        if(next!= null && next.lines.length == 1 && (next.lines[0].startsWith("else if") || next.lines[0].trim().equals("else"))){
+        if(next!= null && next.lines.length == 1 && (next.lines[0].operation.startsWith("elseif") || next.lines[0].operation.equals("else"))){
             CodeBlock aux = next;
             next = next.next;
             aux.next = null;
@@ -626,11 +746,14 @@ class IfBlock extends CodeBlock{
         this.curentFloats = floats;
         this.curentMmatrix = matrix;
 
-        this.lines[0] = this.lines[0].trim();
-        if(!this.lines[0].equals("else")) {
-            String boolExp = this.lines[0].substring(this.lines[0].indexOf('(') + 1, this.lines[0].length() - 1).trim();
+        if(!this.lines[0].operation.equals("else")) {
+            /*String boolExp = this.lines[0].substring(this.lines[0].indexOf('(') + 1, this.lines[0].length() - 1).trim();
             boolExp = boolExp.replaceAll("\\s+","");
             if (evaluateBooleanExpresion(boolExp))
+                this.then.run(floats, matrix);
+            else if(this.elses != null)
+                this.elses.run(floats, matrix);*/
+            if (this.lines[0].first.run(floats, matrix) > 0)
                 this.then.run(floats, matrix);
             else if(this.elses != null)
                 this.elses.run(floats, matrix);
@@ -644,7 +767,7 @@ class IfBlock extends CodeBlock{
     public String toString() {
         StringBuilder rez = new StringBuilder();
         rez.append("start if block\n");
-        for (String line : lines) rez.append("> ").append(line).append("\n");
+        for (CodeLineBit line : lines) rez.append("> ").append(line).append("\n");
 
         if(then != null)
             rez.append("{\n").append(then.toString()).append("}\n");
@@ -666,8 +789,8 @@ class ForBlock extends IfBlock{
     ForBlock(String instructions) {
         super();
         int firstA = instructions.indexOf('{');
-        this.lines = new String[1];
-        this.lines[0] = instructions.substring(0, firstA);
+        this.lines = new CodeLineBit[1];
+        this.lines[0] = CodeLineBit.createBit(instructions.substring(0, firstA));
         int nrP = 1;
         for(int i=firstA+1;i<instructions.length();i++) {
             if(instructions.charAt(i) == '{')
@@ -692,12 +815,10 @@ class ForBlock extends IfBlock{
         this.curentFloats = floats;
         this.curentMmatrix = matrix;
 
-        this.lines[0] = this.lines[0].trim();
+        //String[] parts = this.lines[0].substring(this.lines[0].indexOf('(') + 1, this.lines[0].length() - 1).split(":");
 
-        String[] parts = this.lines[0].substring(this.lines[0].indexOf('(') + 1, this.lines[0].length() - 1).split(":");
-
-        this.assign(parts[0]);
-        for(;evaluateBooleanExpresion(parts[1]);this.assign(parts[2])){
+        lines[0].first.run(floats, matrix);
+        for(;lines[0].second.first.run(floats, matrix) > 0;lines[0].second.second.run(floats, matrix)){
             if(this.then != null)
                 this.then.run(floats, matrix);
         }
@@ -710,7 +831,7 @@ class ForBlock extends IfBlock{
     public String toString() {
         StringBuilder rez = new StringBuilder();
         rez.append("start for block\n");
-        for (String line : lines) rez.append("> ").append(line).append("\n");
+        for (CodeLineBit line : lines) rez.append("> ").append(line).append("\n");
 
         if(then != null)
             rez.append("{\n").append(then.toString()).append("}\n");
@@ -735,11 +856,11 @@ class WhileBlock extends ForBlock{
         this.curentFloats = floats;
         this.curentMmatrix = matrix;
 
-        this.lines[0] = this.lines[0].trim();
+        /*this.lines[0] = this.lines[0].trim();
 
         String part = this.lines[0].substring(this.lines[0].indexOf('(') + 1, this.lines[0].length() - 1);
-
-        while(evaluateBooleanExpresion(part)) {
+*/
+        while(lines[0].run(floats, matrix) > 0) {
             this.then.run(floats, matrix);
         }
 
@@ -751,7 +872,7 @@ class WhileBlock extends ForBlock{
     public String toString() {
         StringBuilder rez = new StringBuilder();
         rez.append("start while block\n");
-        for (String line : lines) rez.append("> ").append(line).append("\n");
+        for (CodeLineBit line : lines) rez.append("> ").append(line).append("\n");
 
         if(then != null)
             rez.append("{\n").append(then.toString()).append("}\n");
@@ -896,7 +1017,6 @@ public class Script {
                     Float r = floats.get("color_r");
                     Float g = floats.get("color_g");
                     Float b = floats.get("color_b");
-                    System.out.println(a +" " + r +" " +g+ " "+b);
                     if (a != null && r != null && g != null && b != null)
                         colors[location] = Color.argb(a / 255, r / 255, g / 255, b / 255);
                     else colors[location] = Color.BLACK;

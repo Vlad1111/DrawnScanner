@@ -68,7 +68,6 @@ class EditScriptActivity : AppCompatActivity() {
             override fun afterTextChanged(p0: Editable?) {
                 if(selectedTabbar == 1)
                     script!!.color = p0.toString()
-                else script!!.image = p0.toString()
             }
         })
         script_tabBar.addOnTabSelectedListener(TabListener(this))
